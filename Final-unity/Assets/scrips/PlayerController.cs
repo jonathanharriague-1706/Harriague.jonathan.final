@@ -3,69 +3,64 @@ using UnityEngine.UI;
 
 public class PlayerController : MonoBehaviour
 {
-    [Header("Configuración de Movimiento")]
-    public float moveSpeed = 8f;
-    public float jumpForce = 10f;
+    [Header("Salud")]
+    public int maxVida = 28;
+    private int vidaActual;
+    public Slider sliderVida;
+
+    [Header("Disparo")]
+    public GameObject balaPrefab;
+    public Transform puntoDisparo;
+
+    [Header("Movimiento")]
+    public float velocidad = 8f;
+    public float fuerzaSalto = 12f;
     private Rigidbody rb;
 
-    [Header("Detección de Suelo")]
-    public Transform groundCheck; // Arrastra aquí el objeto 'Pies'
-    public float checkRadius = 0.3f;
-    public LayerMask whatIsGround; // Selecciona la capa de tu suelo
-    private bool isGrounded;
+    [Header("Suelo")]
+    public Transform groundCheck;
+    public LayerMask capaSuelo;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
-
-        // BLOQUEO DE EJES: Evita movimiento en Z (fondo) y rotaciones indeseadas
+        vidaActual = maxVida;
         rb.constraints = RigidbodyConstraints.FreezeRotation | RigidbodyConstraints.FreezePositionZ;
 
-        // Mejora la fluidez visual del movimiento
-        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        if (sliderVida != null)
+        {
+            sliderVida.maxValue = maxVida;
+            sliderVida.value = maxVida;
+        }
     }
 
     void Update()
     {
-        Mover();
-        Saltar();
-    }
-
-    void Mover()
-    {
-        // Forzamos el uso del eje X (Horizontal)
         float inputX = Input.GetAxisRaw("Horizontal");
+        rb.linearVelocity = new Vector3(inputX * velocidad, rb.linearVelocity.y, 0);
 
-        // Aplicamos velocidad solo en X, mantenemos Y (caída/salto) y 0 en Z
-        rb.linearVelocity = new Vector3(inputX * moveSpeed, rb.linearVelocity.y, 0);
-
-        // Girar el personaje para que mire a la izquierda o derecha
         if (inputX > 0) transform.rotation = Quaternion.Euler(0, 90, 0);
         else if (inputX < 0) transform.rotation = Quaternion.Euler(0, -90, 0);
+
+        if (Physics.CheckSphere(groundCheck.position, 0.3f, capaSuelo) && Input.GetButtonDown("Jump"))
+            rb.AddForce(Vector3.up * fuerzaSalto, ForceMode.Impulse);
+
+        if (Input.GetKeyDown(KeyCode.Z))
+            Instantiate(balaPrefab, puntoDisparo.position, puntoDisparo.rotation);
     }
 
-    void Saltar()
+    // He puesto "UnityEngine.Debug" para que nunca m�s te salga ese error
+    public void RecibirDano(int cantidad)
     {
-        if (groundCheck == null) return;
+        vidaActual -= cantidad;
+        if (sliderVida != null) sliderVida.value = vidaActual;
 
-        // Detecta si el círculo en los pies toca la capa de suelo
-        isGrounded = Physics.CheckSphere(groundCheck.position, checkRadius, whatIsGround);
+        UnityEngine.Debug.Log("Vida Jugador: " + vidaActual);
 
-        if (isGrounded && Input.GetButtonDown("Jump"))
+        if (vidaActual <= 0)
         {
-            // Reset de velocidad vertical antes del impulso para saltos consistentes
-            rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0, 0);
-            rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-        }
-    }
-
-    // Dibuja una esfera en el editor para que veas dónde detecta el suelo
-    private void OnDrawGizmosSelected()
-    {
-        if (groundCheck != null)
-        {
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(groundCheck.position, checkRadius);
+            UnityEngine.Debug.Log("Jugador Muerto");
+            gameObject.SetActive(false);
         }
     }
 }
